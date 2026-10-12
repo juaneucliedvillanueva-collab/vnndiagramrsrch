@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sliding Puzzle</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #faf9f6;
+    font-family: Arial, sans-serif;
+}
+
+.game {
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+}
+
+#puzzle {
+    width: 100%;
+    aspect-ratio: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    background: #dedbd4;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.tile {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+
+.empty {
+    background: #faf9f6 !important;
+    cursor: default;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+button {
+    padding: 11px 18px;
+    border: none;
+    border-radius: 25px;
+    background: #f3b63f;
+    color: #292929;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#enlarge {
+    display: none;
+    background: #e8e6e0;
+}
+
+#message {
+    margin-top: 14px;
+    font-size: 14px;
+    color: #555;
+}
+
+/* Enlarged image overlay */
+#viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.88);
+}
+
+#viewer.open {
+    display: flex;
+}
+
+#largeImage {
+    display: block;
+    max-width: 100%;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+#closeViewer {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: white;
+    color: #222;
+    font-size: 18px;
+}
+
+@media (max-width: 360px) {
+    .controls button {
+        padding: 10px 13px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="game">
+    <div id="puzzle"></div>
+
+    <div class="controls">
+        <button id="shuffle">Shuffle</button>
+        <button id="solve">Solve</button>
+        <button id="enlarge">Enlarge Image</button>
+    </div>
+
+    <p id="message">Loading puzzle...</p>
+</div>
+
+<div id="viewer">
+    <button id="closeViewer">✕ Close</button>
+    <img id="largeImage" alt="Complete puzzle picture">
+</div>
+
+<script>
+// Keep your image in the same repository folder as index.html.
+const IMAGE = "./volleyball.png";
+
+const puzzle = document.getElementById("puzzle");
+const message = document.getElementById("message");
+const solveButton = document.getElementById("solve");
+const enlargeButton = document.getElementById("enlarge");
+const viewer = document.getElementById("viewer");
+const largeImage = document.getElementById("largeImage");
+
+let pieces = [0,1,2,3,4,5,6,7,8];
+let solved = false;
+let imageReady = false;
+
+const picture = new Image();
+
+picture.onload = () => {
+    imageReady = true;
+    largeImage.src = IMAGE;
+    shuffle();
+};
+
+picture.onerror = () => {
+    message.textContent =
+        "Image not found. Check your image filename and folder.";
+};
+
+picture.src = IMAGE;
+
+function isSolved() {
+    return pieces.every((piece, index) => piece === index);
+}
+
+function draw() {
+    puzzle.innerHTML = "";
+
+    enlargeButton.style.display = solved ? "inline-block" : "none";
+    solveButton.style.display = solved ? "none" : "inline-block";
+
+    if (solved) {
+        puzzle.style.display = "block";
+        puzzle.style.padding = "0";
+        puzzle.style.background =
+            `url("${IMAGE}") center / 100% 100% no-repeat`;
+        return;
+    }
+
+    puzzle.style.display = "grid";
+    puzzle.style.padding = "4px";
+    puzzle.style.background = "#dedbd4";
+
+    pieces.forEach((piece, index) => {
+        const tile = document.createElement("button");
+        tile.className = "tile";
+
+        if (piece === 8) {
+            tile.classList.add("empty");
+            tile.disabled = true;
+        } else {
+            const x = piece % 3;
+            const y = Math.floor(piece / 3);
+
+            tile.style.backgroundImage = `url("${IMAGE}")`;
+            tile.style.backgroundSize = "300% 300%";
+            tile.style.backgroundPosition =
+                `${x * 50}% ${y * 50}%`;
+
+            tile.addEventListener("click", () => move(index));
+        }
+
+        puzzle.appendChild(tile);
+    });
+}
+
+function move(index) {
+    if (solved || !imageReady) return;
+
+    const empty = pieces.indexOf(8);
+
+    const sameRow =
+        Math.floor(index / 3) === Math.floor(empty / 3);
+
+    const adjacent =
+        Math.abs(index - empty) === 3 ||
+        (sameRow && Math.abs(index - empty) === 1);
+
+    if (!adjacent) return;
+
+    [pieces[index], pieces[empty]] =
+        [pieces[empty], pieces[index]];
+
+    solved = isSolved();
+
+    draw();
+
+    message.textContent = solved
+        ? "You solved it! 🏐"
+        : "Keep going!";
+}
+
+function shuffle() {
+    if (!imageReady) return;
+
+    closeViewer();
+
+    pieces = [0,1,2,3,4,5,6,7,8];
+
+    let empty = 8;
+    let previous = -1;
+
+    // Shuffle using legal moves to guarantee a solvable puzzle.
+    for (let i = 0; i < 100; i++) {
+        const options = [];
+        const row = Math.floor(empty / 3);
+        const col = empty % 3;
+
+        if (row > 0) options.push(empty - 3);
+        if (row < 2) options.push(empty + 3);
+        if (col > 0) options.push(empty - 1);
+        if (col < 2) options.push(empty + 1);
+
+        const available = options.filter(
+            position => position !== previous
+        );
+
+        const next = available[
+            Math.floor(Math.random() * available.length)
+        ];
+
+        [pieces[empty], pieces[next]] =
+            [pieces[next], pieces[empty]];
+
+        previous = empty;
+        empty = next;
+    }
+
+    if (isSolved()) return shuffle();
+
+    solved = false;
+    draw();
+    message.textContent = "Put the picture back together!";
+}
+
+function solvePuzzle() {
+    if (!imageReady) return;
+
+    pieces = [0,1,2,3,4,5,6,7,8];
+    solved = true;
+
+    draw();
+    message.textContent = "Puzzle solved! 🏐";
+
+    // Solving also opens the enlarged picture.
+    openViewer();
+}
+
+function openViewer() {
+    if (!imageReady || !solved) return;
+
+    viewer.classList.add("open");
+}
+
+function closeViewer() {
+    viewer.classList.remove("open");
+}
+
+document.getElementById("shuffle").addEventListener("click", shuffle);
+solveButton.addEventListener("click", solvePuzzle);
+enlargeButton.addEventListener("click", openViewer);
+document.getElementById("closeViewer").addEventListener("click", closeViewer);
+
+viewer.addEventListener("click", event => {
+    if (event.target === viewer) closeViewer();
+});
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeViewer();
+});
+</script>
+
+</body>
+</html>
